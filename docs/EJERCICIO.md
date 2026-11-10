@@ -166,8 +166,6 @@ Git necesita saber quién eres para firmar tus commits:
 git config --global user.name "Tu Nombre"
 git config --global user.email "tu-correo@empresa.com"
 git config --global init.defaultBranch main
-git config --global pull.rebase false      # al hacer pull, Git une los cambios con un merge
-git config --global core.autocrlf true     # Windows: maneja los saltos de línea
 git config --global --list                 # revisa lo que quedó
 ```
 
@@ -1388,14 +1386,4 @@ Para cualquier error, la rutina de revisión es:
 - **Plan**: simulación de cambios. **Apply**: ejecución real. **Idempotencia**: repetir el `apply` no cambia nada.
 - **Variable**: dato de entrada. **Local**: valor calculado interno. **Output**: dato que se muestra al terminar.
 
----
 
-## Notas para el instructor (preparación antes de la sesión)
-
-1. **Acceso:** invitar a todos los participantes como colaboradores con permiso de escritura al repo `Blaiberg-sierra-beathub/practica-git-terraform`, y confirmar que aceptaron la invitación.
-2. **Base:** hacer merge a `development` (y `main`) de `docs/EJERCICIO.md`, `docs/participantes.md` y del `generated/` añadido a `.gitignore`, antes de que empiece la sesión.
-3. **Checks de los rulesets:** exigen `ci/lint`, `ci/tests` y, en `main`, `ci/security-scan`. El workflow actual solo reporta `ci/terraform`, `ci/security-scan`, `ci/secret-scan` y `ci/meta-lint`. Hasta alinear nombres o rulesets, los PR a `development` quedarán bloqueados esperando checks. Autorizar el merge como administrador o ajustar los rulesets antes.
-4. **Aprobaciones:** si el ruleset exige aprobación, la pareja se aprueba entre sí. Si exige más de una, ajustar a 1 para el ejercicio.
-5. **Carga del CI:** `ci/terraform` hace `init` y `validate` de cada carpeta en `env/dev/*` y `env/pre/*`. Con muchos participantes el job tarda más; es esperable.
-6. **Limpieza posterior:** al terminar, borrar las carpetas `env/dev/<usuario>` de la práctica, o dejar solo las que se quieran conservar.
-7. **Pruebas realizadas:** los 9 pasos de la Parte 3 se probaron uno tras otro (con `apply` en cada paso) con Terraform 1.15 y los providers `local` 2.x y `random` 3.x. No se probó el flujo en Git Bash, el CI con las carpetas de los participantes ni Checkov sobre este código.
