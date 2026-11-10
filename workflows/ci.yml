@@ -1,0 +1,95 @@
+# CI de infraestructura (Terraform). Corre en cada PR hacia main y development.
+#
+# Checks:
+#   ci/terraform        fmt y validate de cada capa de dev y pre (sin backend)
+#   ci/security-scan    Checkov (.checkov.yaml); solo falla con hallazgos nuevos
+#                       respecto a .checkov.baseline
+#   ci/secret-scan      Gitleaks sobre los commits del PR
+#   ci/meta-lint        actionlint sobre los workflows
+#
+# La validación de nomenclatura con los nombres RESUELTOS no corre aquí: necesita
+# el plan contra AWS y se hace en el pipeline de Terraform (CodeBuild), antes
+# del apply (scripts/validate_naming.py en buildspec-terraform-plan.yml).
+name: ci
+
+on:
+  pull_request:
+    branches: [main, preproduction, development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: "1.12.1"
+
+jobs:
+  terraform:
+    name: ci/terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff env modules
+      - name: terraform validate (dev y pre)
+        run: |
+          rc=0
+          for dir in env/dev/*/ env/pre/*/; do
+            echo "::group::$dir"
+            if ! (cd "$dir" && terraform init -backend=false -input=false -no-color >/dev/null && terraform validate -no-color); then
+              echo "::error::terraform validate falló en $dir"
+              rc=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $rc
+
+  security-scan:
+    name: ci/security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Checkov
+        run: |
+          pip install --quiet checkov==3.3.30
+          checkov --config-file .checkov.yaml
+
+  secret-scan:
+    name: ci/secret-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Binario oficial (la gitleaks-action pide licencia en repos de organización).
+      - name: Gitleaks (commits del PR)
+        env:
+          GITLEAKS_VERSION: "8.21.2"
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          if [ -n "$BASE_SHA" ]; then
+            ./gitleaks git --redact --no-banner --verbose --log-opts="$BASE_SHA..HEAD" .
+          else
+            ./gitleaks git --redact --no-banner --verbose .
+          fi
+
+  meta-lint:
+    name: ci/meta-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.4 -color
