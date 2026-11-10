@@ -1,0 +1,5 @@
+directory:
+  - env
+framework:
+  - terraform
+quiet: true
